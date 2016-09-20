@@ -21,9 +21,6 @@ import (
 )
 
 const (
-	//SLACKCHANNEL to alert on
-	// SLACKCHANNEL = "#secops-private"
-	SLACKCHANNEL = "@santrancisco"
 	//POLICE icon
 	POLICE = ":oncoming_police_car:"
 	//GHOST icon
@@ -33,6 +30,7 @@ const (
 )
 
 var (
+	slackchannel  = kingpin.Flag("slack", "Set the name of slack channel this alert goes to").Default("@santrancisco").OverrideDefaultFromEnvar("CHECK_SLACK").Short('s').String()
 	debugflag     = kingpin.Flag("debug", "Enable debug mode.").Default("false").Short('d').Bool()
 	idfileflag    = kingpin.Flag("id", "Save/Get id from file (optional)").Default("false").Bool()
 	org           = kingpin.Flag("org", "Github organisation to check").Default("NONE").OverrideDefaultFromEnvar("CHECK_ORG").Short('o').String()
@@ -83,7 +81,7 @@ func saveIDToFile(currentID int) {
 func sendtoslack(slackreport string) {
 	if slackreport != "" {
 		slackreport = "POTENTIAL CREDENTIALS LEAK:\n\n" + slackreport
-		notify := slackalert.SlackStruct{URL: slackurl, Uploadtoken: slacktoken, Icon: POLICE, Channel: SLACKCHANNEL}
+		notify := slackalert.SlackStruct{URL: slackurl, Uploadtoken: slacktoken, Icon: POLICE, Channel: *slackchannel}
 		notify.Sendmsg("I GOT SOME CREDZ YO!")
 		notify.UploadFile(time.Now().Format("2006-02-01")+".txt", slackreport)
 	}

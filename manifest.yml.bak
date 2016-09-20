@@ -10,8 +10,9 @@ applications:
     GOPACKAGENAME: github.com/santrancisco/checkcommit
     CHECK_ORG: <?= ORG NAME =>
     CHECK_TIMER: 60s
-    CHECK_HTTPPORT: 1337
+    VCAP_APP_PORT: 8080
     CHECK_PERPAGE: 100
+    CHECK_SLACK : "@santrancisco"
     CHECK_SLACKURL: <?= SLACKURL =>
     CHECK_SLACKUPLOADTOKEN: <?= SLACKUPLOADTOKEN =>
     CHECK_GITHUB: <?= GITHUBTOKEN =>
