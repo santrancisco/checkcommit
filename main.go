@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -87,9 +88,14 @@ func sendtoslack(slackreport string) {
 	}
 }
 
+//HelloServer some stuffs
+func HelloServer(w http.ResponseWriter, req *http.Request) {
+	io.WriteString(w, "I am alive!\n")
+}
 func main() {
 	go func() {
-		http.ListenAndServe(fmt.Sprintf(":%s", *httpportForCF), new(http.ServeMux))
+		http.HandleFunc("/", HelloServer)
+		http.ListenAndServe(fmt.Sprintf(":%s", *httpportForCF), nil)
 		panic("health check exited")
 	}()
 
