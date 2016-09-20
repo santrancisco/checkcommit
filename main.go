@@ -37,7 +37,7 @@ var (
 	idfileflag    = kingpin.Flag("id", "Save/Get id from file (optional)").Default("false").Bool()
 	org           = kingpin.Flag("org", "Github organisation to check").Default("NONE").OverrideDefaultFromEnvar("CHECK_ORG").Short('o').String()
 	timer         = kingpin.Flag("timer", "How often in seconds ").Default("60s").Short('t').OverrideDefaultFromEnvar("CHECK_TIMER").Duration()
-	httpportForCF = kingpin.Flag("port", "create a HTTP listener to satisfy CF healthcheck requirement").Default("1337").OverrideDefaultFromEnvar("CHECK_HTTPPORT").Short('p').String()
+	httpportForCF = kingpin.Flag("port", "create a HTTP listener to satisfy CF healthcheck requirement").Default("8080").OverrideDefaultFromEnvar("VCAP_APP_PORT").Short('p').String()
 	perpage       = kingpin.Flag("perpage", "configure the number of events return by API").Default("100").OverrideDefaultFromEnvar("CHECK_PERPAGE").Int()
 	slackurl      = os.Getenv("CHECK_SLACKURL")
 	slacktoken    = os.Getenv("CHECK_SLACKUPLOADTOKEN")
@@ -84,6 +84,7 @@ func sendtoslack(slackreport string) {
 	if slackreport != "" {
 		slackreport = "POTENTIAL CREDENTIALS LEAK:\n\n" + slackreport
 		notify := slackalert.SlackStruct{URL: slackurl, Uploadtoken: slacktoken, Icon: POLICE, Channel: SLACKCHANNEL}
+		notify.Sendmsg("I GOT SOME CREDZ YO!")
 		notify.UploadFile(time.Now().Format("2006-02-01")+".txt", slackreport)
 	}
 }
