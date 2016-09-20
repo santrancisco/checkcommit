@@ -1,6 +1,6 @@
 ### What is this?
 
-This golang app will monitor api.github.com/orgs/AusDTO/events every 60 seconds and look for any commits that may leak the credentials but can be used to look for any other patterns.
+This golang app will monitor api.github.com/orgs/ORG/events every 60 seconds and look for any commits that may leak the credentials but can be used to look for any other patterns.
 
 Users can add more pattern to search for in patterns array in the code. The current patterns array has 1 pattern:
 ```
