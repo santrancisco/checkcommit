@@ -1,0 +1,17 @@
+
+---
+applications:
+- name: checkcommit
+  buildpack: https://github.com/cloudfoundry/go-buildpack.git
+  command: checkcommit
+  memory: 256M
+  env:
+    GOVERSION: go1.6
+    GOPACKAGENAME: github.com/santrancisco/checkcommit
+    CHECK_ORG: <?= ORG NAME =>
+    CHECK_TIMER: 60s
+    CHECK_HTTPPORT: 1337
+    CHECK_PERPAGE: 100
+    CHECK_SLACKURL: <?= SLACKURL =>
+    CHECK_SLACKUPLOADTOKEN: <?= SLACKUPLOADTOKEN =>
+    CHECK_GITHUB: <?= GITHUBTOKEN =>
