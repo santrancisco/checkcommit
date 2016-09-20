@@ -34,7 +34,7 @@ const (
 var (
 	debugflag     = kingpin.Flag("debug", "Enable debug mode.").Default("false").Short('d').Bool()
 	idfileflag    = kingpin.Flag("id", "Save/Get id from file (optional)").Default("false").Bool()
-	org           = kingpin.Flag("org", "Github organisation to check").Default("AusDTO").Short('o').String()
+	org           = kingpin.Flag("org", "Github organisation to check").Default("NONE").Short('o').String()
 	timer         = kingpin.Flag("timer", "How often in seconds ").Default("60s").Short('t').Duration()
 	httpportForCF = kingpin.Flag("port", "create a HTTP listener to satisfy CF healthcheck requirement").Default("1337").OverrideDefaultFromEnvar("HTTPPORT").Short('p').String()
 	perpage       = kingpin.Flag("perpage", "configure the number of events return by API").Default("100").OverrideDefaultFromEnvar("PERPAGE").Int()
