@@ -144,7 +144,7 @@ func main() {
 						pushevent := &github.PushEvent{}
 						json.Unmarshal(*event.RawPayload, &pushevent)
 						debug("[+] Updating: " + *event.Repo.Name)
-						for i, commit := range pushevent.Commits {
+						for _, commit := range pushevent.Commits {
 							thiscommit, _, err := client.Repositories.GetCommit(*org, strings.Split(*event.Repo.Name, "/")[1], *commit.SHA)
 							check(err)
 							debug("[+] By: " + *commit.Author.Name)
@@ -167,6 +167,7 @@ func main() {
 										matches = matches[:i]
 										if len(matches) > 0 {
 											slackreport += "====================================================\n"
+											slackreport += "[+] Event id: " + *event.ID + "\n"
 											slackreport += "[+] Updating: " + *event.Repo.Name + "\n"
 											slackreport += "[+] By: " + *commit.Author.Name + "\n"
 											slackreport += "[+] URL: " + *thiscommit.HTMLURL + "\n"
@@ -176,9 +177,6 @@ func main() {
 										}
 									}
 								}
-							}
-							if i > 1 {
-								break
 							}
 						}
 						//fmt.Println("---------------------")
