@@ -46,7 +46,10 @@ var (
 	regexswitch = "(?mi)"
 	//we can add for more pattern later
 	commitedline = `^\+.*`
-	patterns     = []string{`(secret|password|key|token)+(\|\\|\/|\"|')?\s*(:|=>|=)\s*(\|\\|\/|\"|')?[A-Za-z0-9\/\+\\= ]+(\||\\|\/|\"|')?\s*$`}
+	// matching anything that have secret,password,key,token at the end of the variable and have assignment directive (:|=>|=)
+	patterns = []string{`(secret|password|key|token)+(\|\\|\/|\"|')?\s*(:|=>|=).*`}
+	//falsepositive list - matching anything that has "env"
+	falsepositive = `(?mi)^.*(=|=>|:).*(env).*`
 )
 
 // TODO: PARSING argument using kingpin library
@@ -92,17 +95,18 @@ func HelloServer(w http.ResponseWriter, req *http.Request) {
 	io.WriteString(w, "I am alive!\n")
 }
 func main() {
+	kingpin.Version("0.0.1")
+	kingpin.Parse()
+	ts := oauth2.StaticTokenSource(
+		&oauth2.Token{AccessToken: githubToken},
+	)
+
 	go func() {
 		http.HandleFunc("/", HelloServer)
 		http.ListenAndServe(fmt.Sprintf(":%s", *httpportForCF), nil)
 		panic("health check exited")
 	}()
 
-	kingpin.Version("0.0.1")
-	kingpin.Parse()
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: githubToken},
-	)
 	tc := oauth2.NewClient(oauth2.NoContext, ts)
 	client := github.NewClient(tc)
 	//ListOptions have Page and PerPage options
@@ -151,6 +155,16 @@ func main() {
 									for _, pattern := range patterns {
 										re := regexp.MustCompile(regexswitch + commitedline + pattern)
 										matches := re.FindAllString(*file.Patch, -1)
+										refalse := regexp.MustCompile(falsepositive)
+										i := 0
+										for _, match := range matches {
+											//fmt.Println(match)
+											if !(refalse.MatchString(match)) {
+												matches[i] = match
+												i++
+											}
+										}
+										matches = matches[:i]
 										if len(matches) > 0 {
 											slackreport += "====================================================\n"
 											slackreport += "[+] Updating: " + *event.Repo.Name + "\n"
