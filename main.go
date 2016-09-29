@@ -40,16 +40,18 @@ var (
 	slackurl      = os.Getenv("CHECK_SLACKURL")
 	slacktoken    = os.Getenv("CHECK_SLACKUPLOADTOKEN")
 	githubToken   = os.Getenv("CHECK_GITHUB")
+	githubclient  *github.Client
 	slackreport   = ""
 	// Some regex Note:
 	// (?mi) switch is used for multi-line search and case-insensitive
 	regexswitch = "(?mi)"
 	//we can add for more pattern later
-	commitedline = `^\+.*`
+	commitedlineregex = `(?mi)^\+.*`
 	// matching anything that have secret,password,key,token at the end of the variable and have assignment directive (:|=>|=)
-	patterns = []string{`(secret|password|key|token)+(\|\\|\/|\"|')?\s*(:|=>|=).*`}
+	patterns = []string{`(?mi)(secret|password|key|token)+(\|\\|\/|\"|')?\s*(:|=>|=)\s*.*?(\)|\"|'|\s|$)`}
 	//falsepositive list - matching anything that has "env"
-	falsepositive = `(?mi)^.*(=|=>|:).*(env).*`
+	falsepositive   = []string{`(?mi)^.*(=|=>|:).*(env|fake).*`, `(?mi)^.*(=|=>|:)\s*(true|false)(\)|\"|'|\s|$)`}
+	ignoreextension = []string{"html", "js", "css"}
 )
 
 // TODO: PARSING argument using kingpin library
@@ -81,11 +83,13 @@ func saveIDToFile(currentID int) {
 	check(err)
 }
 
+//Send slackreport to slack
 func sendtoslack(slackreport string) {
-	if slackreport != "" {
+	debug(slackreport)
+	if (slackreport != "") && (!*debugflag) {
 		slackreport = "POTENTIAL CREDENTIALS LEAK:\n\n" + slackreport
 		notify := slackalert.SlackStruct{URL: slackurl, Uploadtoken: slacktoken, Icon: POLICE, Channel: *slackchannel}
-		notify.Sendmsg("I GOT SOME CREDZ YO!")
+		notify.Sendmsg("Incoming falsch positiv aufmerksam!")
 		notify.UploadFile(time.Now().Format("2006-02-01")+".txt", slackreport)
 	}
 }
@@ -94,6 +98,107 @@ func sendtoslack(slackreport string) {
 func HelloServer(w http.ResponseWriter, req *http.Request) {
 	io.WriteString(w, "I am alive!\n")
 }
+
+//Processing list of events
+func processEvents(events []github.Event, previousID int) (interestingEvents []github.Event) {
+	for _, event := range events {
+		// Check and make sure we are not doubling our work
+		currentID, err := strconv.Atoi(*event.ID)
+		check(err)
+		// event.Type is a pointer to string, not a string... apparently?
+		// Anyhow, looks for PushEvent here
+		if (currentID > previousID) && (*event.Type == "PushEvent") {
+			interestingEvents = append(interestingEvents, event)
+			//fmt.Println("---------------------")
+		}
+	}
+	return
+}
+
+// Check if this is a false positive result
+func isFalsePositive(match string) (falsepositiveresult bool) {
+	falsepositiveresult = false
+	for _, pattern := range falsepositive {
+		re := regexp.MustCompile(pattern)
+		//fmt.Println(match)
+		if re.MatchString(match) {
+			falsepositiveresult = true
+			break
+		}
+	}
+	return
+}
+
+// Search for interesting patterns
+func searchPattern(commitlines []string) (matches []string) {
+	for _, match := range commitlines {
+		for _, pattern := range patterns {
+			re := regexp.MustCompile(pattern)
+			//fmt.Println(match)
+			if re.MatchString(match) {
+				narrowscope := re.FindAllString(match, -1)[0]
+				if !isFalsePositive(narrowscope) {
+					matches = append(matches, match)
+					break
+				}
+			}
+
+		}
+	}
+	return
+}
+
+//Process each modified files and look for interesting patterns
+func processFilePatch(file github.CommitFile) (report string) {
+	//Check if file is in the list of ignoreextension
+	debug("Process file")
+	report = ""
+	filename := strings.Split(*file.Filename, ".")
+	ignorefile := false
+	for _, i := range ignoreextension {
+		if filename[len(filename)-1] == i {
+			ignorefile = true
+		}
+	}
+	//Return if file is in the ignore list or there is no patch
+	if ignorefile || (file.Patch == nil) {
+		debug(*file.Filename + " was ignored")
+		return
+	}
+	debug("[+] " + *file.Status + " " + *file.Filename + ":")
+	re := regexp.MustCompile(commitedlineregex)
+	commitedlines := re.FindAllString(*file.Patch, -1)
+	matches := searchPattern(commitedlines)
+	if len(matches) > 0 {
+		report += "[+] " + *file.Status + " " + *file.Filename + ":" + "\n"
+		report += strings.Join(matches, "\n")
+		report += "\n\n"
+	}
+	return
+}
+
+//Proccess each push event
+func processPushEvent(pushevent *github.PushEvent, reponame string) (report string) {
+	report = ""
+	for _, commit := range pushevent.Commits {
+		thiscommit, _, err := githubclient.Repositories.GetCommit(*org, strings.Split(reponame, "/")[1], *commit.SHA)
+		check(err)
+		debug("[+] By: " + *commit.Author.Name)
+		debug("[+] URL: " + *commit.URL)
+		for _, file := range thiscommit.Files {
+			filereport := processFilePatch(file)
+			if filereport == "" {
+				continue
+			}
+			filereport = "[+] URL: " + *thiscommit.HTMLURL + "\n" + filereport
+			filereport = "[+] By: " + *commit.Author.Name + "\n" + filereport
+			filereport = "[+] Updating: " + reponame + "\n" + filereport
+			report += filereport
+		}
+	}
+	return
+}
+
 func main() {
 	kingpin.Version("0.0.1")
 	kingpin.Parse()
@@ -108,7 +213,7 @@ func main() {
 	}()
 
 	tc := oauth2.NewClient(oauth2.NoContext, ts)
-	client := github.NewClient(tc)
+	githubclient = github.NewClient(tc)
 	//ListOptions have Page and PerPage options
 	opt := &github.ListOptions{PerPage: *perpage}
 	previousID := 0
@@ -121,7 +226,7 @@ func main() {
 		debug("Polling github API")
 		debug(fmt.Sprintf("[+] The previous ID is %d", previousID))
 		// Get the latest 100 events from
-		events, _, err := client.Activity.ListEventsForOrganization(*org, opt)
+		events, _, err := githubclient.Activity.ListEventsForOrganization(*org, opt)
 		check(err)
 		latestID, err := strconv.Atoi(*events[0].ID)
 		check(err)
@@ -133,57 +238,21 @@ func main() {
 		if !(latestID > previousID) {
 			debug("[+] No update was made")
 		} else {
-			for _, event := range events {
-				// Check and make sure we are not doubling our work
-				currentID, err := strconv.Atoi(*event.ID)
-				check(err)
-				if currentID > previousID {
-					// event.Type is a pointer to string, not a string... apparently?
-					// Anyhow, looks for PushEvent here
-					if *event.Type == "PushEvent" {
-						pushevent := &github.PushEvent{}
-						json.Unmarshal(*event.RawPayload, &pushevent)
-						debug("[+] Updating: " + *event.Repo.Name)
-						for _, commit := range pushevent.Commits {
-							thiscommit, _, err := client.Repositories.GetCommit(*org, strings.Split(*event.Repo.Name, "/")[1], *commit.SHA)
-							check(err)
-							debug("[+] By: " + *commit.Author.Name)
-							debug("[+] URL: " + *commit.URL)
-							for _, file := range thiscommit.Files {
-								debug("[+] " + *file.Status + " " + *file.Filename + ":")
-								if file.Patch != nil {
-									for _, pattern := range patterns {
-										re := regexp.MustCompile(regexswitch + commitedline + pattern)
-										matches := re.FindAllString(*file.Patch, -1)
-										refalse := regexp.MustCompile(falsepositive)
-										i := 0
-										for _, match := range matches {
-											//fmt.Println(match)
-											if !(refalse.MatchString(match)) {
-												matches[i] = match
-												i++
-											}
-										}
-										matches = matches[:i]
-										if len(matches) > 0 {
-											slackreport += "====================================================\n"
-											slackreport += "[+] Event id: " + *event.ID + "\n"
-											slackreport += "[+] Updating: " + *event.Repo.Name + "\n"
-											slackreport += "[+] By: " + *commit.Author.Name + "\n"
-											slackreport += "[+] URL: " + *thiscommit.HTMLURL + "\n"
-											slackreport += "[+] " + *file.Status + " " + *file.Filename + ":" + "\n"
-											slackreport += strings.Join(matches, "\n")
-											slackreport += "\n\n"
-										}
-									}
-								}
-							}
-						}
-						//fmt.Println("---------------------")
-					}
+			interestingEvents := processEvents(events, previousID)
+			for _, event := range interestingEvents {
+				pushevent := &github.PushEvent{}
+				json.Unmarshal(*event.RawPayload, &pushevent)
+				debug("[+] Updating: " + *event.Repo.Name)
+				pusheventreport := processPushEvent(pushevent, *event.Repo.Name)
+				if pusheventreport == "" {
+					continue
 				}
+				pusheventreport = "[+] Event id: " + *event.ID + "\n" + pusheventreport
+				pusheventreport = "====================================================\n" + pusheventreport
+				slackreport += pusheventreport
 			}
 		}
+
 		previousID = latestID
 		sendtoslack(slackreport)
 		slackreport = ""
