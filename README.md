@@ -27,3 +27,10 @@ Flags:
       --version       Show application version.
 
 ```
+
+Before pushing app to cloudfoundry, you probably want to package all dependencies into vendor folder using godep:
+
+```
+godep save
+cf push
+```
