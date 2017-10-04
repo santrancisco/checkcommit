@@ -15,15 +15,19 @@ Any patterns used for searching will be prepended with  "(?mi)^\+.*" and that is
 
 The app will have HTTP listener on port 1337 that return a 404 because CF health monitoring needs this...
 ```
-Usage: cron_job [<flags>]
+usage: checkcommit [<flags>]
 
 Flags:
-      --help          Show context-sensitive help (also try --help-long and --help-man).
-  -d, --debug         Enable debug mode.
-      --id            Save/Get id from file
-  -o, --org="AusDTO"  Github organisation to check
-  -t, --timer=60s     How often in seconds
-  -p, --port="1337"   create a HTTP listener to satisfy CF healthcheck requirement
-      --version       Show application version.
+      --help                   Show context-sensitive help (also try --help-long and
+                               --help-man).
+  -s, --slack="@santrancisco"  Set the name of slack channel this alert goes to
+  -d, --debug                  Enable debug mode.
+      --id                     Save/Get id from file (optional)
+  -o, --org="NONE"             Github organisation to check
+  -t, --timer=60s              How often in seconds
+  -p, --port="8080"            create a HTTP listener to satisfy CF healthcheck requirement
+      --perpage=100            configure the number of events return by API
+      --version                Show application version.
+
 
 ```
