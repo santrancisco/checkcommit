@@ -50,7 +50,12 @@ var (
 	// matching anything that have secret,password,key,token at the end of the variable and have assignment directive (:|=>|=)
 	patterns = []string{`(?mi)(secret|password|key|token)+(\|\\|\/|\"|')?\s*(:|=>|=)\s*.*?(\)|\"|'|\s|$)`}
 	//falsepositive list - matching anything that has "env"
-	falsepositive   = []string{`(?mi)^.*(=|=>|:).*(env|fake).*`, `(?mi)^.*(=|=>|:)\s*(true|false)(\)|\"|'|\s|$)`}
+	falsepositive   = []string{`(?mi)^.*(=|=>|:).*(env|fake).*`, 
+	                           `(?mi)^.*(=|=>|:)(\)|\"|'|\s)*(true|false)(\)|\"|'|\s|$)`, 
+														 `(?mi)^.*(=|=>|:)(\)|\"|'|\s)*(\$.*)(\)|\"|'|\s|$)`,
+													   `(/?mi)^.*(=|=>|:)(\)|\"|'|\s)*\(\(.*\)\)(\)|\"|'|\s)`,
+														 `(?mi)^.*(=|=>|:)(\)|\"|'|\s)*\{\{.*\}\}(\)|\"|'|\s)`
+												 }
 	ignoreextension = []string{"html", "js", "css"}
 )
 
